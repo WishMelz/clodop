@@ -1,6 +1,6 @@
 {
     "name": "clodop",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "clodop,Lodop,clodop打印插件",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -20,5 +20,7 @@
         "/src"
     ],
     "__npminstall_done": false,
-    "dependencies": {}
+    "devDependencies": {
+        "typescript": "^6.0.3"
+    }
 }

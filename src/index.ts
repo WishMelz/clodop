@@ -29,6 +29,27 @@ function updateUrls(config: Required<LodopConfig>) {
     URL_HTTP2 = `http://localhost:${config.httpPort2}/${MainJS}`
     URL_HTTP3 = `https://localhost.lodop.net:${config.httpsPort}/${MainJS}`
 }
+
+function compareVersion(version?: string, target?: string): number {
+    const parseVersion = (value?: string) =>
+        String(value || '')
+            .split('.')
+            .map((item) => parseInt(item, 10) || 0)
+
+    const versionParts = parseVersion(version)
+    const targetParts = parseVersion(target)
+    const maxLength = Math.max(versionParts.length, targetParts.length)
+
+    for (let index = 0; index < maxLength; index++) {
+        const versionPart = versionParts[index] || 0
+        const targetPart = targetParts[index] || 0
+
+        if (versionPart > targetPart) return 1
+        if (versionPart < targetPart) return -1
+    }
+
+    return 0
+}
 // 初始化默认值
 updateUrls(DEFAULT_CONFIG)
 
@@ -162,39 +183,36 @@ export function initialize(config?: Partial<LodopConfig>): void {
     }
 }
 
+type LodopTipAction = {
+    text: string
+    href: string
+}
+
+function showLodopTip(title: string, description: string, actions: LodopTipAction[]) {
+    const existingTip = document.getElementById('lodop-tip')
+    if (existingTip) {
+        existingTip.remove()
+    }
+
+    const tipElement = document.createElement('div')
+    tipElement.id = 'lodop-tip'
+    tipElement.style.cssText =
+        'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:calc(100% - 32px);max-width:720px;padding:14px 16px;border:1px solid #fecaca;border-radius:8px;background:#fff1f2;color:#7f1d1d;font-size:14px;line-height:1.6;box-shadow:0 10px 24px rgba(127,29,29,.18);'
+
+    const actionHtml = actions
+        .map(
+            (action) =>
+                `<a href="${action.href}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-right:8px;margin-top:8px;padding:4px 10px;border-radius:4px;background:#dc2626;color:#fff;text-decoration:none;">${action.text}</a>`,
+        )
+        .join('')
+
+    tipElement.innerHTML = `<strong style="display:block;margin-bottom:4px;font-size:15px;">${title}</strong><span>${description}</span><div>${actionHtml}</div>`
+    document.body.appendChild(tipElement)
+}
+
 export function getLodop(oOBJECT?: any, oEMBED?: any): any {
-    // Installation messages
-    var strFontTag = "<br><font color='#FF00FF'>打印控件"
-    var strLodopInstall =
-        strFontTag +
-        "未安装!点击这里<a href='install_lodop32.exe' target='_self'>执行安装</a>"
-    var strLodopUpdate =
-        strFontTag +
-        "需要升级!点击这里<a href='install_lodop32.exe' target='_self'>执行升级</a>"
-    var strLodop64Install =
-        strFontTag +
-        "未安装!点击这里<a href='install_lodop64.exe' target='_self'>执行安装</a>"
-    var strLodop64Update =
-        strFontTag +
-        "需要升级!点击这里<a href='install_lodop64.exe' target='_self'>执行升级</a>"
-    var strCLodopInstallA =
-        "<br><font color='#FF00FF'>Web打印服务CLodop未安装启动，点击这里<a href='CLodop_Setup_for_Win32NT.exe' target='_self'>下载执行安装</a>"
-    var strCLodopInstallB =
-        "<br>（若此前已安装过，可<a href='CLodop.protocol:setup' target='_self'>点这里直接再次启动</a>）"
-    var strCLodopUpdate =
-        "<br><font color='#FF00FF'>Web打印服务CLodop需升级!点击这里<a href='CLodop_Setup_for_Win32NT.exe' target='_self'>执行升级</a>"
-    var strLodop7FontTag = "<br><font color='#FF00FF'>Web打印服务Lodop7"
-    var strLodop7HrefX86 =
-        "点击这里<a href='Lodop7_Linux_X86_64.tar.gz' target='_self'>下载安装</a>(下载后解压，点击lodop文件开始执行)"
-    var strLodop7HrefARM =
-        "点击这里<a href='Lodop7_Linux_ARM64.tar.gz'  target='_self'>下载安装</a>(下载后解压，点击lodop文件开始执行)"
-    var strLodop7Install_X86 =
-        strLodop7FontTag + '未安装启动，' + strLodop7HrefX86
-    var strLodop7Install_ARM =
-        strLodop7FontTag + '未安装启动，' + strLodop7HrefARM
-    var strLodop7Update_X86 = strLodop7FontTag + '需升级，' + strLodop7HrefX86
-    var strLodop7Update_ARM = strLodop7FontTag + '需升级，' + strLodop7HrefARM
-    var strInstallOK = '，成功后请刷新本页面或重启浏览器。</font>'
+    const lodopDownloadUrl = 'http://www.c-lodop.com/download.html'
+    const cLodopSetupUrl = 'CLodop.protocol:setup'
 
     try {
         // Detect OS and browser
@@ -215,15 +233,6 @@ export function getLodop(oOBJECT?: any, oEMBED?: any): any {
             detection.isWinIE && /x64/i.test(navigator.userAgent)
 
         let LODOP: any
-        // 检查是否已存在提示元素
-        const existingTip = document.getElementById('lodop-tip')
-        if (existingTip) {
-            existingTip.remove()
-        }
-
-        // 创建新的提示元素
-        const tipElement = document.createElement('div')
-        tipElement.id = 'lodop-tip'
 
         if (needCLodop() || detection.isLinuxX86 || detection.isLinuxARM) {
             try {
@@ -239,33 +248,53 @@ export function getLodop(oOBJECT?: any, oEMBED?: any): any {
                 return
             }
 
-            let strAlertMessage = ''
             if (!LODOP) {
-                if (detection.isLinuxX86) strAlertMessage = strLodop7Install_X86
-                else if (detection.isLinuxARM)
-                    strAlertMessage = strLodop7Install_ARM
-                else
-                    strAlertMessage =
-                        strCLodopInstallA +
-                        (CLodopIsLocal ? strCLodopInstallB : '')
-
-                tipElement.innerHTML = strAlertMessage + strInstallOK
-                document.body.insertBefore(tipElement, document.body.firstChild)
+                if (detection.isLinuxX86 || detection.isLinuxARM) {
+                    showLodopTip(
+                        'Web打印服务 Lodop7 未安装或未启动',
+                        '当前页面无法连接本机 Lodop7 服务。请前往官网下载并安装对应系统版本，安装成功后刷新页面或重启浏览器。',
+                        [{ text: '前往官网下载', href: lodopDownloadUrl }],
+                    )
+                } else {
+                    showLodopTip(
+                        'Web打印服务 CLodop 未安装或未启动',
+                        '当前页面无法连接本机 CLodop 服务。请确认已安装并启动服务，安装成功后刷新页面或重启浏览器。',
+                        [
+                            { text: '前往官网下载', href: lodopDownloadUrl },
+                            ...(CLodopIsLocal
+                                ? [{ text: '尝试启动服务', href: cLodopSetupUrl }]
+                                : []),
+                        ],
+                    )
+                }
                 return
             } else {
-                if (detection.isLinuxX86 && LODOP.CVERSION < '7.0.9.8') {
-                    strAlertMessage = strLodop7Update_X86
-                } else if (detection.isLinuxARM && LODOP.CVERSION < '7.0.9.8') {
-                    strAlertMessage = strLodop7Update_ARM
-                } else if (window.CLODOP.CVERSION < '6.6.1.1') {
-                    strAlertMessage = strCLodopUpdate
-                }
-
-                if (strAlertMessage) {
-                    tipElement.innerHTML = strAlertMessage + strInstallOK
-                    document.body.insertBefore(
-                        tipElement,
-                        document.body.firstChild,
+                if (
+                    detection.isLinuxX86 &&
+                    compareVersion(LODOP.CVERSION, '7.1.1.9') < 0
+                ) {
+                    showLodopTip(
+                        'Web打印服务 Lodop7 需要升级',
+                        '当前 Lodop7 版本过低，可能无法正常打印。请前往官网下载新版，升级成功后刷新页面或重启浏览器。',
+                        [{ text: '前往官网下载', href: lodopDownloadUrl }],
+                    )
+                } else if (
+                    detection.isLinuxARM &&
+                    compareVersion(LODOP.CVERSION, '7.1.1.9') < 0
+                ) {
+                    showLodopTip(
+                        'Web打印服务 Lodop7 需要升级',
+                        '当前 Lodop7 版本过低，可能无法正常打印。请前往官网下载新版，升级成功后刷新页面或重启浏览器。',
+                        [{ text: '前往官网下载', href: lodopDownloadUrl }],
+                    )
+                } else if (
+                    window.CLODOP?.CVERSION &&
+                    compareVersion(window.CLODOP.CVERSION, '6.6.4.2') < 0
+                ) {
+                    showLodopTip(
+                        'Web打印服务 CLodop 需要升级',
+                        '当前 CLodop 版本过低，可能无法正常打印。请前往官网下载新版，升级成功后刷新页面或重启浏览器。',
+                        [{ text: '前往官网下载', href: lodopDownloadUrl }],
                     )
                 }
             }
@@ -300,14 +329,24 @@ export function getLodop(oOBJECT?: any, oEMBED?: any): any {
                 LODOP = CreatedOKLodopObject
             }
               //==Lodop插件未安装时提示下载地址:==
-              if ((!LODOP) || (!LODOP.VERSION)) {
-                tipElement.innerHTML =  (detection.isWinIE64 ? strLodop64Install : strLodopInstall) + strInstallOK
-                document.body.insertBefore(tipElement, document.body.firstChild)
-                return LODOP;
+            if (!LODOP || !LODOP.VERSION) {
+                showLodopTip(
+                    detection.isWinIE64
+                        ? '64位打印控件 Lodop 未安装'
+                        : '打印控件 Lodop 未安装',
+                    '当前页面无法检测到 Lodop 打印控件。请前往官网下载并安装，安装成功后刷新页面或重启浏览器。',
+                    [{ text: '前往官网下载', href: lodopDownloadUrl }],
+                )
+                return LODOP
             }
-            if (LODOP.VERSION < "6.2.2.6") {
-                tipElement.innerHTML =  (detection.isWinIE64 ? strLodop64Update : strLodopUpdate) + strInstallOK
-                document.body.insertBefore(tipElement, document.body.firstChild)
+            if (compareVersion(LODOP.VERSION, '6.2.2.6') < 0) {
+                showLodopTip(
+                    detection.isWinIE64
+                        ? '64位打印控件 Lodop 需要升级'
+                        : '打印控件 Lodop 需要升级',
+                    '当前 Lodop 打印控件版本过低，可能无法正常打印。请前往官网下载新版，升级成功后刷新页面或重启浏览器。',
+                    [{ text: '前往官网下载', href: lodopDownloadUrl }],
+                )
             }
         }
         console.log('当前TOKEN：', window.LodopToken);
