@@ -35,9 +35,12 @@ var URL_HTTP3;
 var CreatedOKLodopObject;
 var CLodopIsLocal;
 var LoadJsState;
+var LodopToken = DEFAULT_CONFIG.token;
 function updateUrls(config) {
-    console.log('clodop config:', config);
-    window.LodopToken = config.token;
+    LodopToken = config.token;
+    if (typeof window !== 'undefined') {
+        window.LodopToken = LodopToken;
+    }
     MainJS = config.mainJS;
     URL_WS1 = "ws://localhost:".concat(config.wsPort1, "/").concat(MainJS);
     URL_WS2 = "ws://localhost:".concat(config.wsPort2, "/").concat(MainJS);
@@ -149,11 +152,21 @@ export function initialize(config) {
     if (config) {
         // 合并配置
         var mergedConfig = __assign(__assign({}, DEFAULT_CONFIG), config);
-        console.log('clodop mergedConfig:', mergedConfig);
         // 更新URLs
         updateUrls(mergedConfig);
     }
+    if (typeof window === 'undefined' ||
+        typeof document === 'undefined' ||
+        typeof navigator === 'undefined') {
+        return;
+    }
     if (!needCLodop())
+        return;
+    if (window.getCLodop) {
+        LoadJsState = 'complete';
+        return;
+    }
+    if (LoadJsState)
         return;
     CLodopIsLocal = !!(URL_WS1 + URL_WS2).match(/\/\/localho|\/\/127.0.0./i);
     LoadJsState = 'loadingA';
@@ -189,8 +202,8 @@ export function initialize(config) {
 }
 function showLodopTip(title, description, actions) {
     var existingTip = document.getElementById('lodop-tip');
-    if (existingTip) {
-        existingTip.remove();
+    if (existingTip && existingTip.parentNode) {
+        existingTip.parentNode.removeChild(existingTip);
     }
     var tipElement = document.createElement('div');
     tipElement.id = 'lodop-tip';
@@ -302,8 +315,7 @@ export function getLodop(oOBJECT, oEMBED) {
                     : '打印控件 Lodop 需要升级', '当前 Lodop 打印控件版本过低，可能无法正常打印。请前往官网下载新版，升级成功后刷新页面或重启浏览器。', [{ text: '前往官网下载', href: lodopDownloadUrl }]);
             }
         }
-        console.log('当前TOKEN：', window.LodopToken);
-        LODOP.SET_LICENSES('', window.LodopToken, '', '');
+        LODOP.SET_LICENSES('', LodopToken, '', '');
         return LODOP;
     }
     catch (err) {

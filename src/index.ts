@@ -18,10 +18,13 @@ let URL_HTTP3: string
 let CreatedOKLodopObject: any
 let CLodopIsLocal: boolean
 let LoadJsState: 'loadingA' | 'loadingB' | 'complete' | undefined
+let LodopToken = DEFAULT_CONFIG.token
 
 function updateUrls(config: Required<LodopConfig>) {
-    console.log('clodop config:', config)
-    window.LodopToken = config.token
+    LodopToken = config.token
+    if (typeof window !== 'undefined') {
+        window.LodopToken = LodopToken
+    }
     MainJS = config.mainJS
     URL_WS1 = `ws://localhost:${config.wsPort1}/${MainJS}`
     URL_WS2 = `ws://localhost:${config.wsPort2}/${MainJS}`
@@ -144,12 +147,23 @@ export function initialize(config?: Partial<LodopConfig>): void {
             ...DEFAULT_CONFIG,
             ...config,
         }
-        console.log('clodop mergedConfig:', mergedConfig)
         // 更新URLs
         updateUrls(mergedConfig)
     }
 
+    if (
+        typeof window === 'undefined' ||
+        typeof document === 'undefined' ||
+        typeof navigator === 'undefined'
+    ) {
+        return
+    }
     if (!needCLodop()) return
+    if (window.getCLodop) {
+        LoadJsState = 'complete'
+        return
+    }
+    if (LoadJsState) return
 
     CLodopIsLocal = !!(URL_WS1 + URL_WS2).match(/\/\/localho|\/\/127.0.0./i)
     LoadJsState = 'loadingA'
@@ -190,8 +204,8 @@ type LodopTipAction = {
 
 function showLodopTip(title: string, description: string, actions: LodopTipAction[]) {
     const existingTip = document.getElementById('lodop-tip')
-    if (existingTip) {
-        existingTip.remove()
+    if (existingTip && existingTip.parentNode) {
+        existingTip.parentNode.removeChild(existingTip)
     }
 
     const tipElement = document.createElement('div')
@@ -349,9 +363,8 @@ export function getLodop(oOBJECT?: any, oEMBED?: any): any {
                 )
             }
         }
-        console.log('当前TOKEN：', window.LodopToken);
 
-        LODOP.SET_LICENSES('', window.LodopToken, '', '')
+        LODOP.SET_LICENSES('', LodopToken, '', '')
         return LODOP
     } catch (err) {
         alert('getLodop出错:' + err)
